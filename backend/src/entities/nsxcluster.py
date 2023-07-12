@@ -17,10 +17,6 @@ class NSXCluster(Entity):
         self.status = status
         self.overall_status = overall_status
 
-    def update_status(self):
-        cluster_result = self.session.get(constants.constants['URL']['NSX_CLUSTER'])
-        self.status = cluster_result['mgmt_cluster_status']['status']
-
 
 class NSXManager(Entity):
     def __init__(self, id, ip, fqdn, status):

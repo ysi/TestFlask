@@ -69,7 +69,7 @@ class NSX_Infra:
         result_json = cluster_result.json()
         if cluster_result.status_code == 200:
             self.cluster = NSXCluster(result_json['cluster_id'], result_json['mgmt_cluster_status']['status'], result_json['detailed_cluster_status']['overall_status'])
-            
+
             # Members
             for member in result_json['detailed_cluster_status']['groups'][0]['members']:
                 self.cluster.members.append(NSXManager(member['member_uuid'], member['member_ip'], member['member_fqdn'], member['member_status']))
@@ -84,6 +84,11 @@ class NSX_Infra:
                     self.cluster.offline_node.append(mb)
 
 
+    def update_cluster_status(self):
+        cluster_result = self.session.get(constants.constants['URL']['NSX_CLUSTER']).json()
+        self.cluster.status = cluster_result['mgmt_cluster_status']['status']
+        return self.cluster.status
+    
     ################################################################################################
     # Segments functions
     def add_segments(self):
