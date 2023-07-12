@@ -3,13 +3,14 @@
 
 from .segment import Segment
 from .transportzone import TransportZone
+from .nsxcluster import NSXCluster, NSXManager
 from ..lib import system
 from src.constants import constants
 
 
 class NSX_Infra:
     def __init__(self, name, session, vip):
-
+        self.segments = []
         if not hasattr(type(self), '_infra'):
             self._create_infra(name, session, vip)
 
@@ -20,7 +21,7 @@ class NSX_Infra:
 
         self.name = name
         self.session = session
-        self.tz = self.add_tz_list(self, session)
+        self.tz = []
         self.name = name
         self.vip = vip
         self.version = ""
@@ -29,9 +30,14 @@ class NSX_Infra:
         self.enforcementpointid = ""
         self.cluster = None
         self.nodes = []
-        self.segments = self.add_segments_list(self, session)
+        self.segments = []
         self.swagger = None
 
+    def discovery(self):
+        print("==> Discovering")
+        self.add_tz()
+        self.add_segments()
+        self.add_cluster()
 
     def show(self):
         print('Infra:')
@@ -43,28 +49,62 @@ class NSX_Infra:
         for tz in self.tz:
             list_tz.append(tz.name)
         print(' - tz: ' + ', '.join(list_tz))
+        list_segment = []
+        for seg in self.segments:
+            list_segment.append(seg.name)
+        print(' - tz: ' + ', '.join(list_segment))
         
     ################################################################################################
     # Transport Zone functions
-    def add_tz_list(self, session):
+    def add_tz(self):
         print("==> Looking up for Transport Zones")
 
-        tz_result = session.get(constants.constants['URL']['TZ'])
-        List_tz = []
+        tz_result = self.session.get(constants.constants['URL']['TZ'])
         if tz_result.status_code == 200 and 'results' in tz_result.json():
             for tzone in tz_result.json()['results']:
-                List_tz.append(TransportZone(tzone['display_name'], tzone['tz_type'],tzone['id'], tzone['is_default'], tzone['path']))
+                # check if segment is not already on the list
+                tz_found = system.search_obj_in_list(self.tz, 'id', tzone['id'])
+                if tz_found is None:
+                    self.tz.append(TransportZone(tzone['display_name'], tzone['tz_type'],tzone['id'], tzone['is_default'], tzone['path']))
 
-        print("== ==> Found " + system.style.GREEN + str(len(List_tz))  + system.style.NORMAL + " Transport Zones")
-        return List_tz
+        print("== ==> Nb Transport Zone " + system.style.GREEN + str(len(self.tz))  + system.style.NORMAL)
+
+    ################################################################################################
+    # Clsuter Status
+    def add_cluster(self):
+        print("==> Looking up for NSX Cluster")
+        # Get NSX Version
+        node_result = self.session.get(constants.constants['URL']['NSX_VERSION'])
+        if node_result.status_code == 200 and 'results' in node_result.json():
+            self.version = node_result["product_version"]
+        
+        # Get NSX Cluster
+        cluster_result = self.session.get(constants.constants['URL']['NSX_CLUSTER'])
+        result_json = cluster_result.json()
+        if cluster_result.status_code == 200:
+            self.cluster = NSXCluster(result_json['cluster_id'], result_json['mgmt_cluster_status']['status'], result_json['detailed_cluster_status']['overall_status'])
+            # Members
+            for member in result_json['detailed_cluster_status']['groups'][0]['members']:
+                self.cluster.members.append(NSXManager(member['member_uuid'], member['member_ip'], member['member_fqdn'], member['member_status']))
+            # online and offline managers
+            for member in result_json['mgmt_cluster_status']['online_nodes']:
+                mb = system.search_obj_in_list(self.cluster.members, 'id', member['uuid'])
+                if member['uuid'] == mb.id and mb not in self.cluster.online_node:
+                    self.cluster.online_node.append(mb)
+            for member in result_json['mgmt_cluster_status']['offline_nodes']:
+                mb = system.search_obj_in_list(self.cluster.members, 'id', member['uuid'])
+                if member['uuid'] == mb.id and mb not in self.cluster.online_node:
+                    self.cluster.offline_node.append(mb)
+
+
+ 
+
 
     ################################################################################################
     # Segments functions
-
-    def add_segments_list(self, session):
+    def add_segments(self):
         print("==> Looking up for segments")
-        seg_result = session.get(constants.constants['URL']['SEGMENTS'])
-        List_segment = []
+        seg_result = self.session.get(constants.constants['URL']['SEGMENTS'])
 
         if seg_result.status_code == 200 and 'results' in seg_result.json():
             for segment in seg_result.json()['results']:
@@ -78,9 +118,10 @@ class NSX_Infra:
                 sg.replication_mode = segment.get('replication_mode')
                 tz = system.search_obj_in_list(self.tz, 'path', segment['transport_zone_path'])
                 sg.transportzone_obj = tz
-                sg.transportzone = tz.name
                 sg.segment_type = tz.type.split('_')[0]
-                List_segment.append(sg)
+                # check if segment is not already on the list
+                sg_found = system.search_obj_in_list(self.segments, 'id', segment['id'])
+                if sg_found is None:
+                    self.segments.append(sg)
 
-        print("== ==> Found " + system.style.GREEN + str(len(List_segment))  + system.style.NORMAL + " Segments")
-        return List_segment
+        print("== ==> Nb Segments " + system.style.GREEN + str(len(self.segments))  + system.style.NORMAL)

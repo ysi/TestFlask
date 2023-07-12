@@ -21,6 +21,8 @@ class NSX_Session:
         if not hasattr(type(self), '_session'):
             self._create_session(self.nsx, self.login, self.password, self.url_session, self.method, self.protocol)
 
+    #####################################################
+    # Create a NSX session (cookie or basic auth)
     @classmethod
     def _create_session(cls, nsx, login, password, url_session, method, protocol):
 
@@ -54,6 +56,8 @@ class NSX_Session:
                 'Accept': '*/*',
                 }
 
+    #####################################################
+    # Close a NSX cookie session
     def destroy_session(self):
         if self.method == 'session':
             result = self._session.post(self.protocol + self.nsx + self.url_destroy)
@@ -61,6 +65,9 @@ class NSX_Session:
                 print("==> Session destroy: " + system.style.GREEN + "Successful" + system.style.NORMAL)
 
 
+    #####################################################
+    # Get API. Handle the disconnection of a session
+    # to do : handle cursor
     def get(self, url):
         retries = 2
         while retries:

@@ -38,6 +38,10 @@ def Read_Yaml(file):
         sys.exit(1)
 
 def search_obj_in_list(list, key, name):
+    """
+    Search in object in a list based on a key and a name
+    Returns an object
+    """
     for item in list:
         if getattr(item, key) == name:
             return item

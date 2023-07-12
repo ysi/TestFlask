@@ -1,5 +1,4 @@
-**/pyc
-**/.DS_Store
-.vscode
 .DS_Store
-lib/__pycache__
+.vscode
+*.pyc
+__pycache__/
