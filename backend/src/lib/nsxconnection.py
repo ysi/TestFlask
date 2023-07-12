@@ -4,6 +4,7 @@
 import requests, urllib3
 from src.lib import system
 from src.constants import constants
+from marshmallow import Schema, fields
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -79,3 +80,9 @@ class NSX_Session:
         raise last_connection_exception
 
 
+class NSXConnectionSchema(Schema):
+    nsx = fields.Str()
+    login = fields.Str()
+    password = fields.Str()
+    protocol = fields.Str()
+    method = fields.Str()

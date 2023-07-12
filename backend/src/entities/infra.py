@@ -1,16 +1,17 @@
 #!/opt/homebrew/bin/python3.9
 # coding=utf-8
-
+from .entity import Entity
 from .segment import Segment
 from .transportzone import TransportZone
-from .nsxcluster import NSXCluster, NSXManager
-from ..lib import system
+from .nsxcluster import NSXCluster, NSXManager, NSXClusterSchema
+from ..lib import system, nsxconnection
 from src.constants import constants
+from marshmallow import Schema, fields
 
 
 class NSX_Infra:
     def __init__(self, name, session, vip):
-        self.segments = []
+        Entity.__init__(self)
         if not hasattr(type(self), '_infra'):
             self._create_infra(name, session, vip)
 
@@ -18,11 +19,9 @@ class NSX_Infra:
     @classmethod
     def _create_infra(self, name, session, vip):
         print("==> Creating Infra for: " + vip  + " - " + system.style.GREEN + "Successful" + system.style.NORMAL)
-
         self.name = name
         self.session = session
         self.tz = []
-        self.name = name
         self.vip = vip
         self.version = ""
         self.siteid = ""
@@ -39,20 +38,6 @@ class NSX_Infra:
         self.add_segments()
         self.add_cluster()
 
-    def show(self):
-        print('Infra:')
-        print(' - name: ' + self.name)
-        print(' - site: ' + self.siteid)
-        print(' - enforcement: ' + self.enforcementpointid)
-        print(' - domain: ' + self.domainid)
-        list_tz = []
-        for tz in self.tz:
-            list_tz.append(tz.name)
-        print(' - tz: ' + ', '.join(list_tz))
-        list_segment = []
-        for seg in self.segments:
-            list_segment.append(seg.name)
-        print(' - tz: ' + ', '.join(list_segment))
         
     ################################################################################################
     # Transport Zone functions
@@ -75,14 +60,16 @@ class NSX_Infra:
         print("==> Looking up for NSX Cluster")
         # Get NSX Version
         node_result = self.session.get(constants.constants['URL']['NSX_VERSION'])
-        if node_result.status_code == 200 and 'results' in node_result.json():
-            self.version = node_result["product_version"]
+        node_json = node_result.json()
+        if node_result.status_code == 200:
+            self.version = node_json["product_version"]
         
         # Get NSX Cluster
         cluster_result = self.session.get(constants.constants['URL']['NSX_CLUSTER'])
         result_json = cluster_result.json()
         if cluster_result.status_code == 200:
             self.cluster = NSXCluster(result_json['cluster_id'], result_json['mgmt_cluster_status']['status'], result_json['detailed_cluster_status']['overall_status'])
+            
             # Members
             for member in result_json['detailed_cluster_status']['groups'][0]['members']:
                 self.cluster.members.append(NSXManager(member['member_uuid'], member['member_ip'], member['member_fqdn'], member['member_status']))
@@ -95,9 +82,6 @@ class NSX_Infra:
                 mb = system.search_obj_in_list(self.cluster.members, 'id', member['uuid'])
                 if member['uuid'] == mb.id and mb not in self.cluster.online_node:
                     self.cluster.offline_node.append(mb)
-
-
- 
 
 
     ################################################################################################
@@ -125,3 +109,17 @@ class NSX_Infra:
                     self.segments.append(sg)
 
         print("== ==> Nb Segments " + system.style.GREEN + str(len(self.segments))  + system.style.NORMAL)
+
+class InfraSchema(Schema):
+    name = fields.Str()
+    session = fields.Nested(nsxconnection.NSXConnectionSchema(only=("nsx","login", "method")))
+    vip = fields.Str()
+    version = fields.Str()
+    siteid = fields.Str()
+    domainid = fields.Str()
+    enforcementpointid = fields.Str()
+    cluster = fields.Nested(NSXClusterSchema)
+    tz = fields.List(fields.Nested(NSXClusterSchema))
+    segments = fields.List(fields.Nested(NSXClusterSchema))
+    created_at = fields.DateTime()
+    updated_at = fields.DateTime()

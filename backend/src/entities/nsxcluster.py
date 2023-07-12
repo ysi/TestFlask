@@ -8,7 +8,6 @@ from src.constants import constants
 
 class NSXCluster(Entity):
     members = []
-    version = ''
     online_node = []
     offline_node = []
     
@@ -43,7 +42,6 @@ class NSXManagerSchema(Schema):
 
 class NSXClusterSchema(Schema):
     id = fields.Str()
-    version = fields.Str()
     status = fields.Str()
     overall_status = fields.Str()
     online_node = fields.List(fields.Nested(NSXManagerSchema))

@@ -47,4 +47,12 @@ def get_cluster():
     # serializing as JSON
     return jsonify(response)
 
+@app.route('/infra')
+def get_infra():
+    # transforming into JSON-serializable objects
+    schema = infra.InfraSchema()
+    response = { 'result': schema.dump(nsx_infra)}
+    # serializing as JSON
+    return jsonify(response)
+
 # nsx_session.destroy_session()
